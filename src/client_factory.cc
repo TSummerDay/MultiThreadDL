@@ -11,15 +11,21 @@ class ClientFactory {
 public:
   using ClientCreator = std::function<std::shared_ptr<Client>()>;
 
-  static ClientFactory *getInstance() {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (ins_ == nullptr) {
-      ins_ = new ClientFactory();
-      std::cout << "instance create" << std::endl;
-    }
-    return ins_;
+  ClientFactory() {
+    registerProtocol("http", [] { return std::make_shared<HttpClient>(); });
+    registerProtocol("https", [] { return std::make_shared<HttpClient>(); });
   }
+  ~ClientFactory() = default;
+
+  // static ClientFactory *getInstance() {
+  //   std::lock_guard<std::mutex> lock(mutex_);
+
+  //   if (ins_ == nullptr) {
+  //     ins_ = new ClientFactory();
+  //     std::cout << "instance create" << std::endl;
+  //   }
+  //   return ins_;
+  // }
   std::shared_ptr<Client> getClient(const std::string &protocol) const {
     auto it = clients_.find(protocol);
     if (it != clients_.end()) {
@@ -32,12 +38,6 @@ public:
   }
 
 private:
-  ClientFactory() {
-    registerProtocol("http", [] { return std::make_shared<HttpClient>(); });
-    registerProtocol("https", [] { return std::make_shared<HttpClient>(); });
-  }
-  ~ClientFactory() = default;
-
   void registerProtocol(const std::string &protocol, ClientCreator createFunc) {
     clients_[protocol] = std::move(createFunc);
   }
@@ -47,14 +47,16 @@ private:
   std::unordered_map<std::string, ClientCreator> clients_; /*= {
       {"http", [] { return std::make_shared<HttpClient>(); }},
       {"https", [] { return std::make_shared<HttpClient>(); }}};*/
-  static ClientFactory *ins_;
-  static std::mutex mutex_;
+  // static ClientFactory *ins_;
+  // static std::mutex mutex_;
 };
 
-ClientFactory *ClientFactory::ins_ = nullptr;
-std::mutex ClientFactory::mutex_;
+// ClientFactory *ClientFactory::ins_ = nullptr;
+// std::mutex ClientFactory::mutex_;
 
 std::shared_ptr<Client> get_clients(const std::string &protocol) {
-  return ClientFactory::getInstance()->getClient(protocol);
+  ClientFactory cf;
+  return cf.getClient(protocol);
+  // return ClientFactory::getInstance()->getClient(protocol);
 }
 } // namespace mltdl

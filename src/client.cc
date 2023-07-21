@@ -46,6 +46,8 @@ Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
     CURLcode res = curl_easy_perform(curl_);
     if (res == CURLE_OK) {
       curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
+      // curl_easy_getinfo(curl_, CURLINFO_CONTENT_TYPE,
+      // &response.content_type);
       if (response.status_code >= 200 && response.status_code < 300) {
         // Request succeeded, break out of the retry loop
         break;

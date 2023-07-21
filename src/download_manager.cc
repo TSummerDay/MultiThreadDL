@@ -12,16 +12,21 @@ namespace mltdl {
 void DownloadManager::addTask(const std::string &url,
                               const std::string &filedir,
                               bool large_file /*=false*/) {
-  thread_pool_.enqueue([this, url, filepath, large_file](int) {
-    this->downloadFile(url, filepath, large_file);
+  thread_pool_.enqueue([this, url, filedir, large_file](int) {
+    this->downloadFile(url, filedir, large_file);
   });
 }
 
 void DownloadManager::downloadFile(const std::string &url,
                                    const std::string filedir,
                                    bool large_file /*=false*/) {
+  if (url.empty()) {
+    std::cout << "url is empty!" << std::endl;
+    return;
+  }
   auto valid = isUrlValid(url);
   if (!valid) {
+    std::cout << url << "url is invalid!" << std::endl;
     return;
   }
   auto protocol = getProtocol(url);
@@ -32,18 +37,23 @@ void DownloadManager::downloadFile(const std::string &url,
   }
   Response response;
   RetryStrategy rs{3, 500, 2};
+  std::unique_lock<std::mutex> lock(mutex_);
+  auto adjusted_filepath = adjustFilepath(filedir, url);
+  FILE *file = fopen(adjusted_filepath.c_str(), "wb");
+  lock.unlock();
   if (large_file) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    auto adjusted_filepath = adjustFilepath(filedir);
-    FILE *file = fopen(adjusted_filepath.c_str(), "wb");
-    lock.unlock();
     response = client->get(url, rs, file);
   } else {
     response = client->get(url, rs);
-    if (response.status_code != 200) {
-      return;
+    if (response.status_code == 200) {
+      size_t written = fwrite(response.body.data(), sizeof(char),
+                              response.body.size(), file);
+      if (written < response.body.size()) {
+        std::cerr << "write file to disk error" << std::endl;
+      }
     }
-    FileHandler::getInstance()->write(filedir, response.body);
   }
+  fclose(file);
+  std::cout << "save file to" << adjusted_filepath << std::endl;
 }
 } // namespace mltdl

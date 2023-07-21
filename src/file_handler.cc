@@ -13,8 +13,7 @@ std::mutex FileHandler::mutex_;
 std::string FileHandler::write(const std::string &filepath,
                                const std::vector<char> &data) {
   std::lock_guard<std::mutex> lock(mutex_);
-  auto adjusted_filepath = adjustFilepath(filepath);
-  std::ofstream file(adjusted_filepath, std::ios::binary);
+  std::ofstream file(filepath, std::ios::binary);
   if (file.is_open()) {
     file.write(data.data(), data.size());
   }

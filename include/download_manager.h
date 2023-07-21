@@ -11,7 +11,7 @@ public:
       : thread_pool_(max_concurrent_tasks) {}
   void addTask(const std::string &url, const std::string &filedir,
                bool large_file = false);
-  void start() { thread_pool_.execute_all(); };
+  void start(bool wait = true) { thread_pool_.execute_all(wait); };
 
 private:
   void downloadFile(const std::string &url, const std::string filedir,

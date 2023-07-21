@@ -24,9 +24,9 @@ int main(int argc, char *argv[]) {
   while (std::cin >> enter) {
     if (enter == "yes") {
       for (const auto &url : urls) {
-        dm.addTask(url, download_dir);
+        dm.addTask(url, download_dir, true);
       }
-      dm.start();
+      dm.start(false);
       std::cout << "Download start ----------- please wait" << std::endl;
       std::cout << "enter 'q' to quit the system" << std::endl;
     } else if (enter == "no") {

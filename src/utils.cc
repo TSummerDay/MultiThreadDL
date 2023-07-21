@@ -67,19 +67,20 @@ std::string getProtocol(const std::string &url) {
   }
 }
 
-std::string adjustFilepath(const std::string &filepath) {
+std::string adjustFilepath(const std::string &filedir, const std::string &url) {
+  auto filename = getUrlName(url);
+  auto filepath = filedir + "/" + filename;
   if (!fs::exists(filepath)) {
     return filepath;
   }
 
-  fs::path p(filepath);
+  fs::path p(filename);
   auto filename_base = p.stem().string();
   auto extension = p.extension().string();
 
   for (auto i = 1;; ++i) {
-    std::ostringstream oss;
-    oss << filename_base << '(' << i << ')' << extension;
-    auto new_filepath = p.parent_path().string() + oss.str();
+    auto new_filepath = filedir + "/" + filename_base + "(" +
+                        std::to_string(i) + ")" + extension;
     if (!fs::exists(new_filepath)) {
       return new_filepath;
     }
@@ -119,4 +120,34 @@ std::string randomStrign(int n) {
 
 std::string getCurPath() { return fs::current_path().string(); }
 
+std::string getUrlName(const std::string &url) {
+  // ensure the url is not empty, although this is almost impossible
+  if (url.empty()) {
+    return "";
+  }
+
+  // find the last '/' position
+  auto last_slash_pos = url.find_last_of('/');
+
+  if (last_slash_pos == std::string::npos) {
+    // give a random name as return
+    return randomStrign(15U);
+  }
+
+  // if "/" is the last char, return a random string
+  if (last_slash_pos == url.size() - 1) {
+    return randomStrign(15U);
+  }
+
+  // extract the rest of string after '/'
+  auto filename = url.substr(last_slash_pos + 1);
+
+  // Finds where possible query parameters start
+  auto query_pos = filename.find_first_of('?');
+  if (query_pos != std::string::npos) {
+    // if found, delete
+    filename = filename.substr(0, query_pos);
+  }
+  return filename;
+}
 } // namespace mltdl

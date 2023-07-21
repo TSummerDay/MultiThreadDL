@@ -11,7 +11,6 @@ namespace mltdl {
 struct Response {
   long status{0};
   long status_code{0};
-  std::string content_type;
   std::vector<char> body;
 };
 
