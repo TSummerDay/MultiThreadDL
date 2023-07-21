@@ -5,6 +5,9 @@
 #include <vector>
 
 namespace mltdl {
+
+// Callback function to write data to a file
+
 class FileHandler {
 public:
   static FileHandler *getInstance() {
@@ -15,6 +18,7 @@ public:
     }
     return ins_;
   }
+
   std::string write(const std::string &filepath, const std::vector<char> &data);
   std::vector<char> read(const std::string &filepath);
 
@@ -24,8 +28,6 @@ private:
   ~FileHandler(){};
   static FileHandler *ins_;
   static std::mutex mutex_;
-
-  std::string adjustFilepath(const std::string &filepath);
 };
 
 } // namespace mltdl

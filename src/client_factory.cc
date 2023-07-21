@@ -1,6 +1,7 @@
 #include "client_factory.h"
 #include "client.h"
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -23,7 +24,9 @@ public:
     if (it != clients_.end()) {
       return it->second();
     } else {
-      throw std::runtime_error("Unsupported protocol");
+      std::cerr << "Unsupported protocol : " << protocol << std::endl;
+      return nullptr;
+      // throw std::runtime_error("Unsupported protocol");
     }
   }
 
@@ -40,7 +43,9 @@ private:
   //   std::shared_ptr<Client> createHttpClient() {
   //     return std::make_shared<HttpClient>();
   //   }
-  std::unordered_map<std::string, ClientCreator> clients_;
+  std::unordered_map<std::string, ClientCreator> clients_; /*= {
+      {"http", [] { return std::make_shared<HttpClient>(); }},
+      {"https", [] { return std::make_shared<HttpClient>(); }}};*/
   static ClientFactory *ins_;
   static std::mutex mutex_;
 };

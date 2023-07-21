@@ -7,6 +7,8 @@
 #include <gtest/gtest.h>
 #include <regex>
 
+namespace mltdl {
+
 const auto g_invalid_urls = {"http:example.com",
                              "xyz:// example.com",
                              "http:// exa<mple.com",
@@ -36,7 +38,6 @@ const auto g_valid_urls = {
     "http://example.com:1234",
     "http://example.com/a/very/long/path/that/keeps/going/and/going/and/going"};
 
-namespace mltdl {
 TEST(Download, url) {
   for (const auto &url : g_invalid_urls) {
     EXPECT_TRUE(!isUrlValid(url));
@@ -47,34 +48,23 @@ TEST(Download, url) {
 }
 
 TEST(Download, client) {
-  //   const auto url = "https://www.kuaidi100.com/";
-  //   ThreadPool thread(5);
-  //   // auto client = std::make_shared<HttpClient>();
-  //   HttpClient client;
-  //   for (auto i = 0; i < 100; ++i) {
-  //     // thread.enqueue([url, client](int) {
-  //     //    auto protocol = getProtocol(url);
-  //     //    auto client = get_clients(protocol);
-  //     auto response = client.get(url);
-  //     response = client.get("http://example.com");
-  //     // response = client.post(url);
-  //     //});
-
-  //     // auto client = get_clients(protocol);
-  //     // auto response = client->get(url);
-  //     // EXPECT_TRUE(response.status_code == 200);
-  //     // response = client->post(url);
-  //     // EXPECT_TRUE(response.status_code == 200);
-  //   }
-  //   thread.execute_all();
+  const auto url = "https://www.kuaidi100.com/";
+  RetryStrategy rs{3, 500, 2};
+  auto protocol = getProtocol(url);
+  auto client = get_clients(protocol);
+  auto response = client->get(url, rs);
+  EXPECT_TRUE(response.status_code == 200);
+  response = client->post(url, rs);
+  EXPECT_TRUE(response.status_code == 200);
 }
 
 TEST(Download, file_handler) {
   const auto url = "https://www.kuaidi100.com/";
   const auto filepath = "test.txt";
+  RetryStrategy rs{3, 500, 2};
   auto protocol = getProtocol(url);
   auto client = get_clients(protocol);
-  auto response = client->get(url);
+  auto response = client->get(url, rs);
   EXPECT_TRUE(response.status_code == 200);
   for (auto i = 0; i < 100; i++) {
     auto adjust_path =
@@ -86,10 +76,10 @@ TEST(Download, file_handler) {
 
 TEST(Download, download_manager) {
   const auto url = "https://www.kuaidi100.com/";
-  const auto filepath = ".test.txt";
+  const auto filepath = "test.txt";
   DownloadManager dm;
   for (auto i = 0; i < 100; ++i) {
-    dm.addTask(url, filepath);
+    dm.addTask(url, filepath, true);
   }
   dm.start();
 }

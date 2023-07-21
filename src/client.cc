@@ -1,8 +1,12 @@
 #include "client.h"
+#include <chrono>
+#include <iostream>
+#include <thread>
 
 namespace mltdl {
 HttpClient::HttpClient() : curl_(curl_easy_init()) {
   if (!curl_) {
+    std::cerr << "Failed to initialize libcurl" << std::endl;
     throw std::runtime_error("Failed to initialize libcurl");
   }
 }
@@ -12,14 +16,19 @@ HttpClient::~HttpClient() {
   }
 }
 
-Response HttpClient::get(const std::string &url) {
+Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
+                         void *userp /*= nullptr*/) {
   Response response;
 
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
-  curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack);
-  curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response.body);
-
+  if (userp != nullptr) {
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack2);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, userp);
+  } else {
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response.body);
+  }
   // when it receives a 301 response, it automatically redirect the request to
   // the new url. However, it is worth noting that this may result in the
   // request being sent to an untrusted server.
@@ -31,24 +40,42 @@ Response HttpClient::get(const std::string &url) {
   curl_easy_setopt(curl_, CURLOPT_REDIR_PROTOCOLS,
                    CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
-  CURLcode res = curl_easy_perform(curl_);
-  if (res != CURLE_OK) {
-    throw std::runtime_error(curl_easy_strerror(res));
+  int delay_ms = rs.delay_ms;
+
+  for (auto i = 0; i < rs.max_retries; ++i) {
+    CURLcode res = curl_easy_perform(curl_);
+    if (res == CURLE_OK) {
+      curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
+      if (response.status_code >= 200 && response.status_code < 300) {
+        // Request succeeded, break out of the retry loop
+        break;
+      } else if (response.status_code == 404) {
+        // Not Found, no sense in retrying
+        std::cerr << "Resource not found, no retries needed" << std::endl;
+        break;
+      }
+    }
+    // Request failed, log the failure and continue the loop
+    std::cerr << "Request failed with error: " << curl_easy_strerror(res)
+              << std::endl;
+    std::cerr << "Retrying after " << delay_ms << " ms ..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    delay_ms *= rs.delay_factor;
   }
-  curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
 
   return response;
 }
-Response HttpClient::post(const std::string &url) {
+Response HttpClient::post(const std::string &url, const RetryStrategy &rs,
+                          void *userp /*= nullptr*/) {
   Response response;
   // Set the URL
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
   // Set the callback function to a no-op function so libcurl does not print the
   // header
-  curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION,
-                   [](void *ptr, size_t size, size_t nmemb,
-                      void *userdata) -> size_t { return size * nmemb; });
+  if (userp) {
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack2);
+  }
 
   // Use HTTP HEAD method
   curl_easy_setopt(curl_, CURLOPT_NOBODY, 1L);
@@ -74,4 +101,10 @@ size_t HttpClient::writeCallBack(void *contents, size_t size, size_t nmemb,
   out->insert(out->end(), (char *)contents, (char *)contents + total_size);
   return total_size;
 }
+size_t HttpClient::writeCallBack2(void *ptr, size_t size, size_t nmemb,
+                                  void *stream) {
+  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
+  return written;
+}
+
 } // namespace mltdl

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <openssl/md5.h>
@@ -59,6 +60,25 @@ std::string getProtocol(const std::string &url) {
     return protocol;
   } else {
     throw std::runtime_error("URL does not contain a protocol");
+  }
+}
+
+std::string adjustFilepath(const std::string &filepath) {
+  if (!std::filesystem::exists(filepath)) {
+    return filepath;
+  }
+
+  std::filesystem::path p(filepath);
+  auto filename_base = p.stem().string();
+  auto extension = p.extension().string();
+
+  for (auto i = 1;; ++i) {
+    std::ostringstream oss;
+    oss << filename_base << '(' << i << ')' << extension;
+    auto new_filepath = p.parent_path().string() + oss.str();
+    if (!std::filesystem::exists(new_filepath)) {
+      return new_filepath;
+    }
   }
 }
 
