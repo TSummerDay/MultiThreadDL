@@ -16,6 +16,7 @@ public:
 
     if (ins_ == nullptr) {
       ins_ = new ClientFactory();
+      std::cout << "instance create" << std::endl;
     }
     return ins_;
   }

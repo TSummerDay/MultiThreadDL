@@ -10,7 +10,7 @@
 namespace mltdl {
 
 void DownloadManager::addTask(const std::string &url,
-                              const std::string &filepath,
+                              const std::string &filedir,
                               bool large_file /*=false*/) {
   thread_pool_.enqueue([this, url, filepath, large_file](int) {
     this->downloadFile(url, filepath, large_file);
@@ -18,7 +18,7 @@ void DownloadManager::addTask(const std::string &url,
 }
 
 void DownloadManager::downloadFile(const std::string &url,
-                                   const std::string filepath,
+                                   const std::string filedir,
                                    bool large_file /*=false*/) {
   auto valid = isUrlValid(url);
   if (!valid) {
@@ -27,14 +27,14 @@ void DownloadManager::downloadFile(const std::string &url,
   auto protocol = getProtocol(url);
   auto client = get_clients(protocol);
   if (client == nullptr) {
-    std::cerr << "Download file failed, file path : " << filepath << std::endl;
+    std::cerr << "Download file failed, file path : " << filedir << std::endl;
     return;
   }
   Response response;
   RetryStrategy rs{3, 500, 2};
   if (large_file) {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto adjusted_filepath = adjustFilepath(filepath);
+    auto adjusted_filepath = adjustFilepath(filedir);
     FILE *file = fopen(adjusted_filepath.c_str(), "wb");
     lock.unlock();
     response = client->get(url, rs, file);
@@ -43,7 +43,7 @@ void DownloadManager::downloadFile(const std::string &url,
     if (response.status_code != 200) {
       return;
     }
-    FileHandler::getInstance()->write(filepath, response.body);
+    FileHandler::getInstance()->write(filedir, response.body);
   }
 }
 } // namespace mltdl

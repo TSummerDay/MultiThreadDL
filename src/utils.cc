@@ -5,12 +5,16 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <openssl/md5.h>
+#include <random>
 #include <regex>
 #include <sstream>
 #include <vector>
 
 namespace mltdl {
+
+namespace fs = std::filesystem;
 
 std::string calculateMd5(const std::string &filepath) {
   std::ifstream file(filepath, std::ios::binary);
@@ -64,11 +68,11 @@ std::string getProtocol(const std::string &url) {
 }
 
 std::string adjustFilepath(const std::string &filepath) {
-  if (!std::filesystem::exists(filepath)) {
+  if (!fs::exists(filepath)) {
     return filepath;
   }
 
-  std::filesystem::path p(filepath);
+  fs::path p(filepath);
   auto filename_base = p.stem().string();
   auto extension = p.extension().string();
 
@@ -76,10 +80,43 @@ std::string adjustFilepath(const std::string &filepath) {
     std::ostringstream oss;
     oss << filename_base << '(' << i << ')' << extension;
     auto new_filepath = p.parent_path().string() + oss.str();
-    if (!std::filesystem::exists(new_filepath)) {
+    if (!fs::exists(new_filepath)) {
       return new_filepath;
     }
   }
 }
+
+bool createDir(const std::string &dir) {
+  if (!fs::exists(dir)) {
+    if (fs::create_directories(dir)) {
+      std::cout << "dir : " << dir << "create success!" << std::endl;
+    } else {
+      std::cout << "can't create dir :" << dir << std::endl;
+      return false;
+    }
+  } else {
+    std::cout << "dir : " << dir << " exists!" << std::endl;
+  }
+  return true;
+}
+
+std::string randomStrign(int n) {
+  const std::string CHARACTERS =
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+  std::random_device random_device;
+  std::mt19937 generator(random_device());
+  std::uniform_int_distribution<> distribution(0, CHARACTERS.size() - 1);
+
+  std::string random_string;
+
+  for (auto i = 0; i < n; ++i) {
+    random_string += CHARACTERS[distribution(generator)];
+  }
+
+  return random_string;
+}
+
+std::string getCurPath() { return fs::current_path().string(); }
 
 } // namespace mltdl

@@ -1,3 +1,26 @@
+# Check whether the third-party library uri exists
+LIB_DIR = thirdparty/uri
+LIB_URI_INCLUDE_DIR = $(LIB_DIR)/include
+URI_LIB = $(LIB_URI_INCLUDE_DIR)/network/uri.hpp
+URI_BUILD_DIR = $(LIB_DIR)/_build
+
+uri: $(URI_LIB)
+
+$(URI_LIB):
+	@if [ ! -d $(LIB_DIR) ]; then \
+		echo "Url library not found. Cloning..."; \
+		git clone https://github.com/cpp-netlib/uri.git $(LIB_DIR); \
+	fi
+	@if [ ! -d $(URI_BUILD_DIR) ]; then \
+		echo "Uri library not built. Building..."; \
+		cd $(LIB_DIR); \
+		mkdir _build; \
+		cd _build; \
+		cmake ..; \
+		make -j4; \
+	fi
+
+
 # Compiler to use
 CXX = g++
 

@@ -11,6 +11,7 @@ namespace mltdl {
 struct Response {
   long status{0};
   long status_code{0};
+  std::string content_type;
   std::vector<char> body;
 };
 
@@ -45,8 +46,11 @@ public:
 
 private:
   // declare the callback function as static in multithread
+  // Byte stream is loaded into memory
   static size_t writeCallBack(void *contents, size_t size, size_t nmemb,
                               std::vector<char> *out);
+
+  // Fetch byte streams in batches and write them to disk
   static size_t writeCallBack2(void *ptr, size_t size, size_t nmemb,
                                void *stream);
   CURL *curl_{nullptr};
