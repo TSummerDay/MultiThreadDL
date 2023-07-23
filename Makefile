@@ -20,13 +20,13 @@ TEST_LDLIBS = -lgtest -lgtest_main -pthread
 # Source and object files
 SRC_DIR = src
 OBJ_DIR = obj
-SRC = $(wildcard $(SRC_DIR)/*.cc)
-OBJ = $(SRC:$(SRC_DIR)/%.cc=$(OBJ_DIR)/%.o)
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 # Test files
 TEST_DIR = tests
-TEST_SRC = $(wildcard $(TEST_DIR)/*.cc)
-TEST_OBJ = $(TEST_SRC:$(TEST_DIR)/%.cc=$(OBJ_DIR)/%.o)
+TEST_SRC = $(wildcard $(TEST_DIR)/*.cpp)
+TEST_OBJ = $(TEST_SRC:$(TEST_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 TESTS = $(TEST_OBJ:$(OBJ_DIR)/%.o=%)
 
 # The name of the main executable
@@ -37,7 +37,7 @@ all: $(EXE)
 $(EXE): $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
@@ -46,7 +46,7 @@ tests: $(TESTS)
 $(TESTS): %: $(OBJ_DIR)/%.o $(filter-out $(OBJ_DIR)/$(EXE).o, $(OBJ))
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS) $(TEST_LDLIBS)
 
-$(OBJ_DIR)/%.o: $(TEST_DIR)/%.cc
+$(OBJ_DIR)/%.o: $(TEST_DIR)/%.cpp
 	mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
