@@ -37,10 +37,13 @@ void DownloadManager::downloadFile(const std::string &url,
   }
   Response response;
   RetryStrategy rs{3, 500, 2};
+  // Lock when create the file on the disk.
+  // Prevents multiple threads from writing to the same file simultaneously
   std::unique_lock<std::mutex> lock(mutex_);
   auto adjusted_filepath = adjustFilepath(filedir, url);
   FILE *file = fopen(adjusted_filepath.c_str(), "wb");
   lock.unlock();
+
   if (large_file) {
     response = client->get(url, rs, file);
   } else {

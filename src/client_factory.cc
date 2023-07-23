@@ -17,15 +17,6 @@ public:
   }
   ~ClientFactory() = default;
 
-  // static ClientFactory *getInstance() {
-  //   std::lock_guard<std::mutex> lock(mutex_);
-
-  //   if (ins_ == nullptr) {
-  //     ins_ = new ClientFactory();
-  //     std::cout << "instance create" << std::endl;
-  //   }
-  //   return ins_;
-  // }
   std::shared_ptr<Client> getClient(const std::string &protocol) const {
     auto it = clients_.find(protocol);
     if (it != clients_.end()) {
@@ -33,30 +24,22 @@ public:
     } else {
       std::cerr << "Unsupported protocol : " << protocol << std::endl;
       return nullptr;
-      // throw std::runtime_error("Unsupported protocol");
     }
   }
 
 private:
+  // Register the corresponding client to client factory
   void registerProtocol(const std::string &protocol, ClientCreator createFunc) {
     clients_[protocol] = std::move(createFunc);
   }
-  //   std::shared_ptr<Client> createHttpClient() {
-  //     return std::make_shared<HttpClient>();
-  //   }
-  std::unordered_map<std::string, ClientCreator> clients_; /*= {
-      {"http", [] { return std::make_shared<HttpClient>(); }},
-      {"https", [] { return std::make_shared<HttpClient>(); }}};*/
-  // static ClientFactory *ins_;
-  // static std::mutex mutex_;
+  std::unordered_map<std::string, ClientCreator> clients_;
 };
 
-// ClientFactory *ClientFactory::ins_ = nullptr;
-// std::mutex ClientFactory::mutex_;
-
+// curl instance is thread-safe
+// A curl can execute only one request task at a time
+// Make sure that each thread has an instance of curl
 std::shared_ptr<Client> get_clients(const std::string &protocol) {
   ClientFactory cf;
   return cf.getClient(protocol);
-  // return ClientFactory::getInstance()->getClient(protocol);
 }
 } // namespace mltdl
