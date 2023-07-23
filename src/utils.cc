@@ -46,6 +46,13 @@ std::string calculateMd5(const std::string &filepath) {
 }
 
 bool isUrlValid(const std::string &url) {
+  /*
+   * This regular expression cannot cover all cases
+   * One solution is to introduce an open source library
+   * https://github.com/cpp-netlib/uri.git
+   * url = network::uri::parse(url_str);
+   * if the url_str is invalid , it will throw an exception
+   */
   std::regex g_url_regex(
       R"(^(http|https|ftp)://([a-z0-9.-]+)(:[0-9]+)?(/[\w-./?%&=]*)?$)");
   if (std::regex_match(url, g_url_regex)) {

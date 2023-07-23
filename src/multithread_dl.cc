@@ -37,6 +37,6 @@ int main(int argc, char *argv[]) {
       urls.push_back(enter);
     }
   }
-
+  // The thread pool waits for all tasks to complete before exiting the program
   return 0;
 }

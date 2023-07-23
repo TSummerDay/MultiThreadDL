@@ -6,8 +6,6 @@
 
 namespace mltdl {
 
-// Callback function to write data to a file
-
 class FileHandler {
 public:
   static FileHandler *getInstance() {
