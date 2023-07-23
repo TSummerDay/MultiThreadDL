@@ -1,7 +1,6 @@
 #include "thread_pool.h"
 
-#include <cstdlib>
-#include <utility>
+#include <iostream>
 
 namespace mltdl {
 
@@ -9,54 +8,50 @@ ThreadPool::ThreadPool(const char *name /*=""*/)
     : name_(name), running_(true), work_complete_(true), adding_work_(false),
       active_threads_(0) {}
 
-ThreadPool::ThreadPool(int num_thread, bool set_affinity,
-                       const char *name /*=""*/)
+ThreadPool::ThreadPool(int num_thread, const char *name /*=""*/)
     : ThreadPool(name) {
-  init(num_thread, set_affinity);
+  init(num_thread);
 }
 
 ThreadPool::~ThreadPool() { shutdown(); }
 
-bool ThreadPool::init(int32_t num_thread,
-                      bool set_affinity /*= true*/) noexcept {
+bool ThreadPool::init(int32_t num_thread) {
   num_thread =
       num_thread == -1 ? (int)std::thread::hardware_concurrency() : num_thread;
   threads_.resize(num_thread);
   // Start the threads in the main loop
   for (int i = 0; i < num_thread; ++i) {
-    threads_[i] =
-        std::thread(std::bind(&ThreadPool::thread_main, this, i, set_affinity));
+    threads_[i] = std::thread(std::bind(&ThreadPool::threadMain, this, i));
   }
   tl_errors_.resize(num_thread);
   return true;
 }
 
-void ThreadPool::enqueue(Work work, int64_t priority,
-                         bool finished_adding_work) noexcept {
+void ThreadPool::enqueue(Work work, bool finished_adding_work) {
   std::lock_guard<std::mutex> lock(mutex_);
-  work_queue_.push({priority, std::move(work)});
+  work_queue_.push(std::move(work));
   work_complete_ = false;
   adding_work_ = !finished_adding_work;
 }
 
-void ThreadPool::spawn(Work work, int64_t priority) noexcept {
-  enqueue(std::move(work), priority, true);
+void ThreadPool::spawn(Work work) {
+  enqueue(std::move(work), true);
   // Signal a thread to complete the work
   condition_.notify_one();
 }
 
 // abort all work and shutdown all threads
-void ThreadPool::abort() noexcept {
+void ThreadPool::abort() {
   std::unique_lock<std::mutex> lock(mutex_);
   while (!work_queue_.empty())
     work_queue_.pop();
 }
 
-bool ThreadPool::queueempty() noexcept { return work_queue_.empty(); }
+bool ThreadPool::queueempty() { return work_queue_.empty(); }
 
 // shutdown all the threads in the pool
-void ThreadPool::shutdown() noexcept {
-  wait_for_completion(false);
+void ThreadPool::shutdown() {
+  waitForCompletion(false);
   std::unique_lock<std::mutex> lock(mutex_);
   running_ = false;
   condition_.notify_all();
@@ -69,35 +64,37 @@ void ThreadPool::shutdown() noexcept {
 }
 
 // Blocks until all work issued to the thread pool is complete
-void ThreadPool::wait_for_completion(bool checkForErrors) {
+void ThreadPool::waitForCompletion(bool checkForErrors) {
   std::unique_lock<std::mutex> lock(mutex_);
   completed_.wait(lock, [this] { return this->work_complete_; });
 
   if (checkForErrors) {
     // Check for errors
     for (size_t i = 0; i < threads_.size(); ++i) {
-      if (!tl_errors_[i].empty()) {
-        // Throw the first error that occurred
-        auto error = "Error in thread";
+      while (!tl_errors_[i].empty()) {
+        // print the error that occurred
+        std::cerr << "Thread id :" << i << " error : " << tl_errors_[i].front()
+                  << std::endl;
         tl_errors_[i].pop();
-        throw std::runtime_error(error);
       }
     }
   }
 }
 
-void ThreadPool::execute_all(bool wait) {
+// Wake up an equal number of threads to execute the task, but not more than the
+// maximum number of threads
+void ThreadPool::executeAll(bool wait) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     adding_work_ = false;
   }
   condition_.notify_one();
   if (wait) {
-    wait_for_completion();
+    waitForCompletion();
   }
 }
 
-int ThreadPool::size() const noexcept { return threads_.size(); }
+int ThreadPool::size() const { return threads_.size(); }
 
 std::vector<std::thread::id> ThreadPool::thread_ids() const {
   std::vector<std::thread::id> tids;
@@ -107,7 +104,7 @@ std::vector<std::thread::id> ThreadPool::thread_ids() const {
   return tids;
 }
 
-void ThreadPool::thread_main(int thread_id, bool set_affinity) {
+void ThreadPool::threadMain(int thread_id) {
   // DeviceGuard g(device_id);
   while (running_) {
     // Block on the condition to wait for work
@@ -117,12 +114,13 @@ void ThreadPool::thread_main(int thread_id, bool set_affinity) {
     });
 
     // If we're no longer running, exit the run loop
-    if (!running_)
+    if (!running_) {
       break;
+    }
 
     // Get work from the queue & mark
     // this thread as active
-    Work work = std::move(work_queue_.top().second);
+    Work work = std::move(work_queue_.front());
     work_queue_.pop();
     bool should_wake_next = !work_queue_.empty();
     ++active_threads_;
@@ -135,7 +133,7 @@ void ThreadPool::thread_main(int thread_id, bool set_affinity) {
     }
 
     // If an error occurs, we save it in tl_errors_. When
-    // wait_for_completion is called, we will check for any errors
+    // waitForCompletion is called, we will check for any errors
     // in the threads and return an error if one occurs.
     try {
       work(thread_id);

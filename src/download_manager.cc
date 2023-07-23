@@ -26,7 +26,7 @@ void DownloadManager::downloadFile(const std::string &url,
   }
   auto valid = isUrlValid(url);
   if (!valid) {
-    std::cout << url << "url is invalid!" << std::endl;
+    std::cout << url << " url is invalid!" << std::endl;
     return;
   }
   auto protocol = getProtocol(url);

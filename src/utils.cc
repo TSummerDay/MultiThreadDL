@@ -16,6 +16,7 @@ namespace mltdl {
 
 namespace fs = std::filesystem;
 
+// Calculates the md5 of a file
 std::string calculateMd5(const std::string &filepath) {
   std::ifstream file(filepath, std::ios::binary);
   if (!file.is_open()) {
@@ -108,6 +109,7 @@ bool createDir(const std::string &dir) {
   return true;
 }
 
+// generate a random string
 std::string randomStrign(int n) {
   const std::string CHARACTERS =
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
