@@ -67,32 +67,50 @@ Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
 
   return response;
 }
-Response HttpClient::post(const std::string &url, const RetryStrategy &rs,
-                          void *userp /*= nullptr*/) {
+Response HttpClient::post(const std::string &url,
+                          const std::string &post_fields,
+                          const RetryStrategy &rs, void *userp /*= nullptr*/) {
   Response response;
-  // Set the URL
+
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
-  // Set the callback function to a no-op function so libcurl does not print the
-  // header
-  if (userp) {
+  // Enable the POST method
+  curl_easy_setopt(curl_, CURLOPT_POST, 1L);
+  // Set POST fields
+  curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, post_fields.c_str());
+
+  if (userp != nullptr) {
     curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack2);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, userp);
+  } else {
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response.body);
   }
 
-  // Use HTTP HEAD method
-  curl_easy_setopt(curl_, CURLOPT_NOBODY, 1L);
+  curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl_, CURLOPT_MAXREDIRS, 10L);
+  curl_easy_setopt(curl_, CURLOPT_REDIR_PROTOCOLS,
+                   CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
-  // Perform the request
-  CURLcode res = curl_easy_perform(curl_);
-  if (res != CURLE_OK) {
-    throw std::runtime_error(curl_easy_strerror(res));
+  int delay_ms = rs.delay_ms;
+
+  for (auto i = 0; i < rs.max_retries; ++i) {
+    CURLcode res = curl_easy_perform(curl_);
+    if (res == CURLE_OK) {
+      curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
+      if (response.status_code >= 200 && response.status_code < 300) {
+        break;
+      } else if (response.status_code == 404) {
+        std::cerr << "Resource not found, no retries needed" << std::endl;
+        break;
+      }
+    }
+    std::cerr << "Request failed with error: " << curl_easy_strerror(res)
+              << std::endl;
+    std::cerr << "Retrying after " << delay_ms << " ms ..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    delay_ms *= rs.delay_factor;
   }
-
-  // Get the HTTP response code
-  curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
-
-  // Reset the HTTP method to HTTP GET for future requests
-  curl_easy_setopt(curl_, CURLOPT_NOBODY, 0L);
 
   return response;
 }

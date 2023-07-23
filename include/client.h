@@ -29,8 +29,8 @@ public:
 
   virtual Response get(const std::string &url, const RetryStrategy &rs,
                        void *userp = nullptr) = 0;
-  virtual Response post(const std::string &url, const RetryStrategy &rs,
-                        void *userp = nullptr) = 0;
+  virtual Response post(const std::string &url, const std::string &post_fields,
+                        const RetryStrategy &rs, void *userp = nullptr) = 0;
 };
 
 class HttpClient : public Client {
@@ -40,8 +40,8 @@ public:
 
   Response get(const std::string &url, const RetryStrategy &rs,
                void *userp = nullptr) override;
-  Response post(const std::string &url, const RetryStrategy &rs,
-                void *userp = nullptr) override;
+  Response post(const std::string &url, const std::string &post_fields,
+                const RetryStrategy &rs, void *userp = nullptr) override;
 
 private:
   // declare the callback function as static in multithread

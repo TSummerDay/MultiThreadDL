@@ -15,7 +15,7 @@ TEST(Download, client) {
   auto client = get_clients(protocol);
   auto response = client->get(url, rs);
   EXPECT_TRUE(response.status_code == 200);
-  response = client->post(url, rs);
+  response = client->post(url, "test", rs);
   EXPECT_TRUE(response.status_code == 200);
 }
 
