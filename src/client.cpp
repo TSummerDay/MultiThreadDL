@@ -4,49 +4,49 @@
 #include <thread>
 
 namespace mltdl {
-HttpClient::HttpClient() : curl_(curl_easy_init()) {
-  if (!curl_) {
-    std::cerr << "Failed to initialize libcurl" << std::endl;
-    throw std::runtime_error("Failed to initialize libcurl");
-  }
+HttpClient::HttpClient() {
+  // if (!curl_) {
+  //   std::cerr << "Failed to initialize libcurl" << std::endl;
+  //   throw std::runtime_error("Failed to initialize libcurl");
+  // }
 }
 HttpClient::~HttpClient() {
-  if (curl_) {
-    curl_easy_cleanup(curl_);
-  }
+  // if (curl_) {
+  //   curl_easy_cleanup(curl_);
+  // }
 }
 
 Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
-                         void *userp /*= nullptr*/) {
+                         CURL *curl, void *userp /*= nullptr*/) {
   Response response;
 
-  curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
   if (userp != nullptr) {
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack2);
-    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, userp);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallBack2);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, userp);
   } else {
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack);
-    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response.body);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallBack);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
   }
   // when it receives a 301 response, it automatically redirect the request to
   // the new url. However, it is worth noting that this may result in the
   // request being sent to an untrusted server.
-  curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
   // Limit the number of redirects to 10
-  curl_easy_setopt(curl_, CURLOPT_MAXREDIRS, 10L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
   // Specify the redirection protocol as HTTP and HTTPS
-  curl_easy_setopt(curl_, CURLOPT_REDIR_PROTOCOLS,
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS,
                    CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
   int delay_ms = rs.delay_ms;
 
   for (auto i = 0; i < rs.max_retries; ++i) {
-    CURLcode res = curl_easy_perform(curl_);
+    CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {
-      curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
-      // curl_easy_getinfo(curl_, CURLINFO_CONTENT_TYPE,
+      curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status_code);
+      // curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE,
       // &response.content_type);
       if (response.status_code >= 200 && response.status_code < 300) {
         // Request succeeded, break out of the retry loop
@@ -69,35 +69,36 @@ Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
 }
 Response HttpClient::post(const std::string &url,
                           const std::string &post_fields,
-                          const RetryStrategy &rs, void *userp /*= nullptr*/) {
+                          const RetryStrategy &rs, CURL *curl,
+                          void *userp /*= nullptr*/) {
   Response response;
 
-  curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
   // Enable the POST method
-  curl_easy_setopt(curl_, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
   // Set POST fields
-  curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, post_fields.c_str());
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_fields.c_str());
 
   if (userp != nullptr) {
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack2);
-    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, userp);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallBack2);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, userp);
   } else {
-    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCallBack);
-    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response.body);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallBack);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
   }
 
-  curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl_, CURLOPT_MAXREDIRS, 10L);
-  curl_easy_setopt(curl_, CURLOPT_REDIR_PROTOCOLS,
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS,
                    CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
   int delay_ms = rs.delay_ms;
 
   for (auto i = 0; i < rs.max_retries; ++i) {
-    CURLcode res = curl_easy_perform(curl_);
+    CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {
-      curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response.status_code);
+      curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status_code);
       if (response.status_code >= 200 && response.status_code < 300) {
         break;
       } else if (response.status_code == 404) {
@@ -113,6 +114,25 @@ Response HttpClient::post(const std::string &url,
   }
 
   return response;
+}
+
+int64_t HttpClient::getFileSize(const std::string &url, CURL *curl) {
+  double file_size{0.0};
+
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  // Make a HEAD request
+  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res == CURLE_OK) {
+    curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &file_size);
+  } else {
+    std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res)
+              << std::endl;
+    return -1;
+  }
+  return static_cast<int64_t>(file_size);
 }
 
 size_t HttpClient::writeCallBack(void *contents, size_t size, size_t nmemb,

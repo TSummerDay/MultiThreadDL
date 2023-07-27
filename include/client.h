@@ -28,9 +28,11 @@ public:
   using CallBack = std::function<size_t(void *, size_t, size_t, void *)>;
 
   virtual Response get(const std::string &url, const RetryStrategy &rs,
-                       void *userp = nullptr) = 0;
+                       CURL *curl, void *userp = nullptr) = 0;
   virtual Response post(const std::string &url, const std::string &post_fields,
-                        const RetryStrategy &rs, void *userp = nullptr) = 0;
+                        const RetryStrategy &rs, CURL *curl,
+                        void *userp = nullptr) = 0;
+  virtual int64_t getFileSize(const std::string &url, CURL *curl) = 0;
 };
 
 class HttpClient : public Client {
@@ -38,10 +40,12 @@ public:
   HttpClient();
   ~HttpClient();
 
-  Response get(const std::string &url, const RetryStrategy &rs,
+  Response get(const std::string &url, const RetryStrategy &rs, CURL *curl,
                void *userp = nullptr) override;
   Response post(const std::string &url, const std::string &post_fields,
-                const RetryStrategy &rs, void *userp = nullptr) override;
+                const RetryStrategy &rs, CURL *curl,
+                void *userp = nullptr) override;
+  int64_t getFileSize(const std::string &url, CURL *curl) override;
 
 private:
   // declare the callback function as static in multithread
@@ -52,7 +56,7 @@ private:
   // Fetch byte streams in batches and write them to disk
   static size_t writeCallBack2(void *ptr, size_t size, size_t nmemb,
                                void *stream);
-  CURL *curl_{nullptr};
+  // CURL *curl_{nullptr};
 };
 
 } // namespace mltdl

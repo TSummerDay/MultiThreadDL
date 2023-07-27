@@ -20,6 +20,8 @@ void DownloadManager::addTask(const std::string &url,
 void DownloadManager::downloadFile(const std::string &url,
                                    const std::string filedir,
                                    bool large_file /*=false*/) {
+  CurlGuard guard(curl_pool_);
+  auto curl = guard.handle();
   if (url.empty()) {
     std::cout << "url is empty!" << std::endl;
     return;
@@ -27,6 +29,9 @@ void DownloadManager::downloadFile(const std::string &url,
   auto valid = isUrlValid(url);
   if (!valid) {
     std::cout << url << " url is invalid!" << std::endl;
+    return;
+  }
+  if (curl == nullptr) {
     return;
   }
   auto protocol = getProtocol(url);
@@ -45,9 +50,9 @@ void DownloadManager::downloadFile(const std::string &url,
   lock.unlock();
 
   if (large_file) {
-    response = client->get(url, rs, file);
+    response = client->get(url, rs, curl, file);
   } else {
-    response = client->get(url, rs);
+    response = client->get(url, rs, curl);
     if (response.status_code == 200) {
       size_t written = fwrite(response.body.data(), sizeof(char),
                               response.body.size(), file);
