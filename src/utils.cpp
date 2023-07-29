@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <openssl/md5.h>
+#include <openssl/sha.h>
 #include <random>
 #include <regex>
 #include <sstream>
@@ -20,7 +21,8 @@ namespace fs = std::filesystem;
 std::string calculateMd5(const std::string &filepath) {
   std::ifstream file(filepath, std::ios::binary);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to open file");
+    std::cerr << "Can't open file: " << filepath << "\n";
+    return "";
   }
 
   std::vector<char> buffer(MD5_DIGEST_LENGTH);
@@ -44,6 +46,33 @@ std::string calculateMd5(const std::string &filepath) {
         << static_cast<int>(result[i]);
   }
   return oss.str();
+}
+
+std::string calculateSHA256(const std::string &filepath) {
+  std::ifstream file(filepath.c_str(), std::ifstream::binary);
+  if (!file) {
+    std::cerr << "Can't open file: " << filepath << "\n";
+    return "";
+  }
+
+  SHA256_CTX sha256;
+  SHA256_Init(&sha256);
+  char buffer[4096];
+  while (file.good()) {
+    file.read(buffer, sizeof(buffer));
+    SHA256_Update(&sha256, buffer, file.gcount());
+  }
+  unsigned char hash[SHA256_DIGEST_LENGTH];
+  SHA256_Final(hash, &sha256);
+
+  std::ostringstream shaStr;
+
+  for (const auto &byte : hash) {
+    shaStr.fill('0');
+    shaStr.width(2);
+    shaStr << std::hex << static_cast<int>(byte);
+  }
+  return shaStr.str();
 }
 
 bool isUrlValid(const std::string &url) {
@@ -108,6 +137,8 @@ bool createDir(const std::string &dir) {
   }
   return true;
 }
+
+void createFile(const std::string &filename) { std::ofstream file(filename); }
 
 // generate a random string
 std::string randomStrign(int n) {

@@ -4,22 +4,15 @@
 #include <thread>
 
 namespace mltdl {
-HttpClient::HttpClient() {
-  // if (!curl_) {
-  //   std::cerr << "Failed to initialize libcurl" << std::endl;
-  //   throw std::runtime_error("Failed to initialize libcurl");
-  // }
-}
-HttpClient::~HttpClient() {
-  // if (curl_) {
-  //   curl_easy_cleanup(curl_);
-  // }
-}
+HttpClient::HttpClient() {}
+HttpClient::~HttpClient() {}
 
 Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
-                         CURL *curl, void *userp /*= nullptr*/) {
+                         CURL *curl, int64_t start, int64_t end,
+                         void *userp /*= nullptr*/) {
   Response response;
 
+  curl_easy_reset(curl);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
   if (userp != nullptr) {
@@ -33,7 +26,9 @@ Response HttpClient::get(const std::string &url, const RetryStrategy &rs,
   // the new url. However, it is worth noting that this may result in the
   // request being sent to an untrusted server.
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
+  char range[64];
+  snprintf(range, sizeof(range), "%ld-%ld", start, end);
+  curl_easy_setopt(curl, CURLOPT_RANGE, range);
   // Limit the number of redirects to 10
   curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
   // Specify the redirection protocol as HTTP and HTTPS
@@ -73,6 +68,7 @@ Response HttpClient::post(const std::string &url,
                           void *userp /*= nullptr*/) {
   Response response;
 
+  curl_easy_reset(curl);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
   // Enable the POST method
@@ -118,7 +114,7 @@ Response HttpClient::post(const std::string &url,
 
 int64_t HttpClient::getFileSize(const std::string &url, CURL *curl) {
   double file_size{0.0};
-
+  curl_easy_reset(curl);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   // Make a HEAD request
   curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);

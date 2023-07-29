@@ -1,67 +1,151 @@
 #include "download_manager.h"
 #include "client.h"
 #include "client_factory.h"
+#include "file_guard.h"
 #include "file_handler.h"
 #include "utils.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 namespace mltdl {
 
-void DownloadManager::addTask(const std::string &url,
-                              const std::string &filedir,
-                              bool large_file /*=false*/) {
-  thread_pool_.enqueue([this, url, filedir, large_file](int) {
-    this->downloadFile(url, filedir, large_file);
-  });
-}
-
-void DownloadManager::downloadFile(const std::string &url,
-                                   const std::string filedir,
-                                   bool large_file /*=false*/) {
+/**
+ * 0: the download failed, but normal exit does not require retry
+ * 1: the download success
+ * -1: there is probably a network problem and it is worth trying again
+ */
+int DownloadManager::download(const std::string &url,
+                              const std::string &file_dir) {
   CurlGuard guard(curl_pool_);
   auto curl = guard.handle();
   if (url.empty()) {
     std::cout << "url is empty!" << std::endl;
-    return;
+    return 0;
   }
   auto valid = isUrlValid(url);
   if (!valid) {
     std::cout << url << " url is invalid!" << std::endl;
-    return;
+    return 0;
   }
+  auto protocol = getProtocol(url);
+  auto client = get_clients(protocol);
   if (curl == nullptr) {
+    return 0;
+  }
+  auto file_size = client->getFileSize(url, curl);
+  if (file_size < 0) {
+    return -1;
+  }
+  auto part_size = file_size / num_thread_;
+  auto file_path = adjustFilepath(file_dir, url);
+  createFile(file_path);
+  std::vector<std::string> temp_file_paths(num_thread_);
+  for (auto i = 0; i < num_thread_; ++i) {
+    auto temp_file_path = adjustFilepath(file_dir, url);
+    temp_file_paths[i] = temp_file_path;
+    createFile(temp_file_path);
+  }
+  for (auto i = 0; i < num_thread_; ++i) {
+    int64_t start = i * part_size;
+    int64_t end = ((i + 1) * part_size) - 1;
+    if (i == num_thread_ - 1) {
+      end = file_size - 1;
+    }
+    thread_pool_.enqueue([this, url, start, end, temp_file_paths, i](int) {
+      this->downloadFile(url, temp_file_paths[i], start, end);
+    });
+  }
+  // start all task and wait them complete
+  start();
+  auto merge_size = fileMerge(file_path, temp_file_paths);
+  if (merge_size != file_size) {
+    std::cerr << "merge file failed" << std::endl;
+    std::remove(file_path.c_str());
+    return -1;
+  }
+  auto md5 = calculateMd5(file_path);
+  auto sha256 = calculateSHA256(file_path);
+  std::cout << "md5: " << md5 << std::endl;
+  std::cout << "sha256: " << sha256 << std::endl;
+  std::cout << "file save to :" << file_path << std::endl;
+  return 1;
+}
+
+void DownloadManager::downloadFile(const std::string &url,
+                                   const std::string &file_path, int64_t start,
+                                   int64_t end) {
+  CurlGuard guard(curl_pool_);
+  FileGuard file_guard(file_path, "wb");
+  auto curl = guard.handle();
+  auto file = file_guard.handle();
+  if (!file) {
+    std::cerr << "file open failed" << file_path << std::endl;
     return;
   }
   auto protocol = getProtocol(url);
   auto client = get_clients(protocol);
   if (client == nullptr) {
-    std::cerr << "Download file failed, file path : " << filedir << std::endl;
+    std::cerr << "Download file failed" << std::endl;
     return;
   }
   Response response;
   RetryStrategy rs{3, 500, 2};
-  // Lock when create the file on the disk.
-  // Prevents multiple threads from writing to the same file simultaneously
-  std::unique_lock<std::mutex> lock(mutex_);
-  auto adjusted_filepath = adjustFilepath(filedir, url);
-  FILE *file = fopen(adjusted_filepath.c_str(), "wb");
-  lock.unlock();
 
-  if (large_file) {
-    response = client->get(url, rs, curl, file);
-  } else {
-    response = client->get(url, rs, curl);
-    if (response.status_code == 200) {
-      size_t written = fwrite(response.body.data(), sizeof(char),
-                              response.body.size(), file);
-      if (written < response.body.size()) {
-        std::cerr << "write file to disk error" << std::endl;
+  response = client->get(url, rs, curl, start, end, file);
+}
+
+/**
+ * when I was working on the file merge operation, I discovered a problem
+ * I use FileGuard class to create these files and write data in them , then I
+ * read these file by std::ifstream, and write the target file by std::ofstream,
+ * I find the target file usualy less than the sum of these files.
+ * The most likely reason is that the end character (EOF) is different when
+ * reading and writing binary files at the bottom
+ *
+ * Through subsequent learning, I understand that this is because I use
+ * while(file.read(buffer, sizeof(buffer)) when reading a file with
+ * std::ifstream, and std::ifstream::read() after reading a specified byte, If
+ * the End of file (EOF) is encountered, the read will also stop. But that
+ * doesn't mean read() didn't read any data. Therefore, at the end of the loop,
+ * file.eof() should be judged to be true, and the number of bytes last read
+ * should be written.
+ */
+
+int64_t
+DownloadManager::fileMerge(const std::string file_path,
+                           const std::vector<std::string> &temp_file_paths) {
+  FileGuard output_file(file_path, "wb");
+  int64_t merge_size = 0;
+  if (!output_file.handle()) {
+    std::cerr << "Failed to open output file" << std::endl;
+    return merge_size;
+  }
+  char buffer[1024];
+  for (auto i = 0; i < num_thread_; ++i) {
+    FileGuard input_file(temp_file_paths[i], "rb");
+    if (!input_file.handle()) {
+      std::cerr << "Failed to open input file: " << temp_file_paths[i]
+                << std::endl;
+      continue;
+    }
+    while (!feof(input_file.handle())) {
+      size_t read_size = fread(buffer, 1, sizeof(buffer), input_file.handle());
+      if (ferror(input_file.handle())) {
+        std::cerr << "Error reading input file: " << temp_file_paths[i]
+                  << std::endl;
+        break;
+      }
+      merge_size += read_size;
+      fwrite(buffer, 1, read_size, output_file.handle());
+      if (ferror(output_file.handle())) {
+        std::cerr << "Error writing to output file" << std::endl;
+        break;
       }
     }
+    std::remove(temp_file_paths[i].c_str());
   }
-  fclose(file);
-  std::cout << "save file to" << adjusted_filepath << std::endl;
+  return merge_size;
 }
 } // namespace mltdl

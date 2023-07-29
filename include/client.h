@@ -28,7 +28,8 @@ public:
   using CallBack = std::function<size_t(void *, size_t, size_t, void *)>;
 
   virtual Response get(const std::string &url, const RetryStrategy &rs,
-                       CURL *curl, void *userp = nullptr) = 0;
+                       CURL *curl, int64_t start, int64_t end,
+                       void *userp = nullptr) = 0;
   virtual Response post(const std::string &url, const std::string &post_fields,
                         const RetryStrategy &rs, CURL *curl,
                         void *userp = nullptr) = 0;
@@ -41,7 +42,7 @@ public:
   ~HttpClient();
 
   Response get(const std::string &url, const RetryStrategy &rs, CURL *curl,
-               void *userp = nullptr) override;
+               int64_t start, int64_t end, void *userp = nullptr) override;
   Response post(const std::string &url, const std::string &post_fields,
                 const RetryStrategy &rs, CURL *curl,
                 void *userp = nullptr) override;
@@ -56,7 +57,6 @@ private:
   // Fetch byte streams in batches and write them to disk
   static size_t writeCallBack2(void *ptr, size_t size, size_t nmemb,
                                void *stream);
-  // CURL *curl_{nullptr};
 };
 
 } // namespace mltdl

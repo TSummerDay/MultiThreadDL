@@ -2,7 +2,7 @@
 
 namespace mltdl {
 CurlPool::CurlPool(int num_curl) {
-  for (auto i = 0; i < num_curl; ++i) {
+  for (auto i = 0; i <= num_curl; ++i) {
     CURL *curl = curl_easy_init();
     curls_.push(curl);
   }
@@ -22,12 +22,12 @@ CurlPool::~CurlPool() {
  * pool because of an exception or error.
  */
 CURL *CurlPool::acquire() {
-  std::loack_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
   if (curls_.empty()) {
     return curl_easy_init();
   }
   CURL *curl = curls_.front();
-  curls.pop();
+  curls_.pop();
   return curl;
 }
 
