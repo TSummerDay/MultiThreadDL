@@ -39,7 +39,7 @@ private:
 // A curl can execute only one request task at a time
 // Make sure that each thread has an instance of curl
 std::shared_ptr<Client> get_clients(const std::string &protocol) {
-  ClientFactory cf;
+  static ClientFactory cf;
   return cf.getClient(protocol);
 }
 } // namespace mltdl
