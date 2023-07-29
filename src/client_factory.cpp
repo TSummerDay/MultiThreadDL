@@ -35,9 +35,11 @@ private:
   std::unordered_map<std::string, ClientCreator> clients_;
 };
 
-// curl instance is thread-safe
-// A curl can execute only one request task at a time
-// Make sure that each thread has an instance of curl
+/**
+ * Because curl is not a member variable in client, it is declared static
+ * Note, however, that if a new Client object has member variables that are
+ * unsafe in multithreading, it cannot be declared static
+ */
 std::shared_ptr<Client> get_clients(const std::string &protocol) {
   static ClientFactory cf;
   return cf.getClient(protocol);
