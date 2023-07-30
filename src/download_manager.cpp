@@ -15,6 +15,9 @@ namespace mltdl {
  * 0: the download failed, but normal exit does not require retry
  * 1: the download success
  * -1: there is probably a network problem and it is worth trying again
+ *
+ * to be more reasonable, it should define a Status class to represent different
+ * states
  */
 int DownloadManager::download(const std::string &url,
                               const std::string &file_dir) {
@@ -36,6 +39,17 @@ int DownloadManager::download(const std::string &url,
   }
   auto file_size = client->getFileSize(url, curl);
   if (file_size < 0) {
+    /**
+     * If the file size of the resource cannot be obtained, do I need to return
+     * to single-threaded download?
+     *
+     * If the size of the obtained file does not match the actual size, and it
+     * does not have Content-MD5 or Content-SHA in the request header, the
+     * download fails
+     *
+     * We may need to manually verify the MD5 and SHA of the resource after the
+     * download is complete
+     */
     return -1;
   }
   auto part_size = file_size / num_thread_;
@@ -58,6 +72,7 @@ int DownloadManager::download(const std::string &url,
     });
   }
   // start all task and wait them complete
+  std::cout << "Download start, please wait ---------" << std::endl;
   start();
   auto merge_size = fileMerge(file_path, temp_file_paths);
   if (merge_size != file_size) {

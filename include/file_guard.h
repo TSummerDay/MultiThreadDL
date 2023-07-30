@@ -14,6 +14,9 @@ public:
   }
   FILE *handle() { return file_; }
 
+  FileGuard(const FileGuard &) = delete;
+  FileGuard &operator=(const FileGuard &) = delete;
+
 private:
   FILE *file_;
 };
