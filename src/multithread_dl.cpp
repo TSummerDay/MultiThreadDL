@@ -55,11 +55,15 @@ int main(int argc, char *argv[]) {
       DownloadManager dm(num_thread);
       num_thread /= 2;
       auto status = dm.download(url, download_dir);
-      if (status >= 0) {
+      if (status == 1) {
         std::cout << "Download success" << std::endl;
         break;
+      } else if (status == 0) {
+        std::cout << "Download failed" << std::endl;
+        break;
+      } else {
+        std::cout << "Download failed -------retrying" << std::endl;
       }
-      std::cout << "Download failed -------retrying" << std::endl;
     }
   } else {
     printHelp();
